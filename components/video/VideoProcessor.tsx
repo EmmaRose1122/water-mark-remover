@@ -581,11 +581,11 @@ export function VideoProcessor({ videoFile, onReset }: VideoProcessorProps) {
 
                 {/* High-Performance Clean Video Player with Full Audio */}
                 <div className="relative aspect-video rounded-xl overflow-hidden border border-emerald-500/40 bg-black shadow-2xl group">
-                  {/* Clean Rendered Video / Original Video */}
+                  {/* Base Video Element */}
                   <video
                     ref={resultVideoRef}
                     key={showOriginalComparison ? 'orig' : 'clean'}
-                    src={showOriginalComparison ? videoUrl : resultVideoUrl}
+                    src={resultVideoUrl || videoUrl}
                     playsInline
                     muted={resultIsMuted}
                     className="w-full h-full object-contain"
@@ -597,8 +597,14 @@ export function VideoProcessor({ videoFile, onReset }: VideoProcessorProps) {
                     onEnded={() => setResultIsPlaying(false)}
                   />
 
+                  {/* Clean Dynamic Background Inpainting Canvas Overlay */}
+                  <canvas
+                    ref={resultCanvasOverlayRef}
+                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                  />
+
                   {/* Badge */}
-                  <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[11px] font-semibold text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                  <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[11px] font-semibold text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 z-10">
                     <Sparkles className="w-3 h-3 text-amber-300" />
                     <span>
                       {showOriginalComparison

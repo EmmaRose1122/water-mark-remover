@@ -250,6 +250,17 @@ export function inpaintFrameDynamic(
           filledData[p + 1] = Math.round(totalG / totalWeight)
           filledData[p + 2] = Math.round(totalB / totalWeight)
           filledData[p + 3] = 255
+        } else {
+          // Guaranteed fallback from nearest perimeter pixels
+          const edgeX = bx < boxW / 2 ? 0 : boxW - 1
+          const edgeY = by < boxH / 2 ? 0 : boxH - 1
+          const sIdx = edgeY * boxW + edgeX
+          const p = idx * 4
+          const sp = sIdx * 4
+          filledData[p] = origData[sp]
+          filledData[p + 1] = origData[sp + 1]
+          filledData[p + 2] = origData[sp + 2]
+          filledData[p + 3] = 255
         }
       }
     }
