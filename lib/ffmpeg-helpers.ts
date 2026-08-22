@@ -27,27 +27,9 @@ export async function loadFFmpeg(onLog?: (msg: string) => void): Promise<FFmpeg>
     ffmpeg.on('log', ({ message }) => onLog(message))
   }
 
-  // Attempt 1: Load from local public directory (/ffmpeg/...)
+  // Attempt 1: Load from unpkg / jsdelivr @ffmpeg/core@0.12.10 (Exact matched version)
   try {
-    const origin = typeof window !== 'undefined' ? window.location.origin : ''
-    const localCore = `${origin}/ffmpeg/ffmpeg-core.js`
-    const localWasm = `${origin}/ffmpeg/ffmpeg-core.wasm`
-
-    await ffmpeg.load({
-      coreURL: await toBlobURL(localCore, 'text/javascript'),
-      wasmURL: await toBlobURL(localWasm, 'application/wasm'),
-    })
-
-    ffmpegInstance = ffmpeg
-    isFFmpegLoading = false
-    return ffmpeg
-  } catch (localErr) {
-    console.warn('Local FFmpeg load failed, attempting CDN fallback:', localErr)
-  }
-
-  // Attempt 2: Load from jsdelivr / unpkg CDN
-  try {
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm'
+    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm'
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
       wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -57,11 +39,39 @@ export async function loadFFmpeg(onLog?: (msg: string) => void): Promise<FFmpeg>
     isFFmpegLoading = false
     return ffmpeg
   } catch (cdnErr) {
+    console.warn('Primary CDN FFmpeg load failed, attempting jsdelivr fallback:', cdnErr)
+  }
+
+  // Attempt 2: Load from jsdelivr CDN
+  try {
+    const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm'
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    })
+
+    ffmpegInstance = ffmpeg
     isFFmpegLoading = false
-    console.error('All FFmpeg WASM load attempts failed:', cdnErr)
-    throw new Error(
-      'WebAssembly FFmpeg engine unavailable in this browser environment.'
-    )
+    return ffmpeg
+  } catch (jsDelivrErr) {
+    console.warn('jsDelivr FFmpeg load failed, attempting local fallback:', jsDelivrErr)
+  }
+
+  // Attempt 3: Load from local origin
+  try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${origin}/ffmpeg/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${origin}/ffmpeg/ffmpeg-core.wasm`, 'application/wasm'),
+    })
+
+    ffmpegInstance = ffmpeg
+    isFFmpegLoading = false
+    return ffmpeg
+  } catch (localErr) {
+    isFFmpegLoading = false
+    console.error('All FFmpeg load attempts failed:', localErr)
+    throw new Error('WebAssembly FFmpeg engine unavailable in this browser environment.')
   }
 }
 
