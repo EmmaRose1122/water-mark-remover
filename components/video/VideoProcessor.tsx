@@ -250,6 +250,16 @@ export function VideoProcessor({ videoFile, onReset }: VideoProcessorProps) {
               ref={videoRef}
               src={videoUrl}
               className="w-full h-full object-contain"
+              onLoadedMetadata={() => {
+                if (videoRef.current?.duration && isFinite(videoRef.current.duration)) {
+                  setDuration(videoRef.current.duration)
+                }
+              }}
+              onDurationChange={() => {
+                if (videoRef.current?.duration && isFinite(videoRef.current.duration)) {
+                  setDuration(videoRef.current.duration)
+                }
+              }}
               onTimeUpdate={() => {
                 if (videoRef.current) setCurrentTime(videoRef.current.currentTime)
               }}

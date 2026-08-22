@@ -44,22 +44,30 @@ export async function processVideoWithNativeEngine({
   onProgress?.('inpaint', 100, 'Watermark boundary analyzed')
   onProgress?.('render', 10, 'Initializing video engine...')
 
-  // Step 2: Probe video metadata
+  // Step 2: Probe accurate video metadata (Full length without artificial limits)
   const videoObjectUrl = URL.createObjectURL(videoFile)
   const probeVideo = document.createElement('video')
   probeVideo.src = videoObjectUrl
-  probeVideo.preload = 'metadata'
+  probeVideo.preload = 'auto'
   probeVideo.muted = true
 
   await new Promise<void>((resolve) => {
-    probeVideo.onloadedmetadata = () => resolve()
+    const onReady = () => {
+      if (probeVideo.duration && isFinite(probeVideo.duration) && probeVideo.duration > 0) {
+        resolve()
+      }
+    }
+    probeVideo.onloadedmetadata = onReady
+    probeVideo.ondurationchange = onReady
+    probeVideo.oncanplay = () => resolve()
     probeVideo.onerror = () => resolve()
-    setTimeout(resolve, 1200)
+    setTimeout(resolve, 2000)
   })
 
   const vidW = probeVideo.videoWidth || 1280
   const vidH = probeVideo.videoHeight || 720
-  const duration = Math.min(probeVideo.duration || 10, 60)
+  const rawDuration = probeVideo.duration
+  const duration = rawDuration && isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 10
   URL.revokeObjectURL(videoObjectUrl)
 
   const scaleX = vidW / (processedMask.maskWidth || 1280)
