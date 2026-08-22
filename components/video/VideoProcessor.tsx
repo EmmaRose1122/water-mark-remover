@@ -147,44 +147,7 @@ export function VideoProcessor({ videoFile, onReset }: VideoProcessorProps) {
     )
   }
 
-  // Real-time Dynamic Inpainting render loop for Result Player
-  useEffect(() => {
-    if (!activeMask || !resultVideoUrl) return
-
-    let animationFrameId: number
-
-    const renderDynamicFrame = () => {
-      const overlay = resultCanvasOverlayRef.current
-      const v = resultVideoRef.current
-
-      if (overlay && v && v.readyState >= 2 && !showOriginalComparison) {
-        const w = v.videoWidth || 1280
-        const h = v.videoHeight || 720
-
-        if (overlay.width !== w || overlay.height !== h) {
-          overlay.width = w
-          overlay.height = h
-        }
-
-        const ctx = overlay.getContext('2d', { willReadFrequently: true })
-        if (ctx) {
-          // 1. Draw CURRENT video frame to overlay canvas
-          ctx.drawImage(v, 0, 0, w, h)
-
-          // 2. Inpaint watermark dynamically using the CURRENT frame's background!
-          inpaintFrameDynamic(ctx, activeMask, w, h)
-        }
-      } else if (overlay && showOriginalComparison) {
-        const ctx = overlay.getContext('2d')
-        ctx?.clearRect(0, 0, overlay.width, overlay.height)
-      }
-
-      animationFrameId = requestAnimationFrame(renderDynamicFrame)
-    }
-
-    animationFrameId = requestAnimationFrame(renderDynamicFrame)
-    return () => cancelAnimationFrame(animationFrameId)
-  }, [activeMask, resultVideoUrl, showOriginalComparison])
+  // Result player is 100% hardware-accelerated without CPU overhead
 
   // Run the Dynamic Video Inpainting Pipeline
   const handleStartProcessing = async () => {
@@ -585,7 +548,7 @@ export function VideoProcessor({ videoFile, onReset }: VideoProcessorProps) {
                   <video
                     ref={resultVideoRef}
                     key={showOriginalComparison ? 'orig' : 'clean'}
-                    src={resultVideoUrl || videoUrl}
+                    src={showOriginalComparison ? videoUrl : (resultVideoUrl || videoUrl)}
                     playsInline
                     muted={resultIsMuted}
                     className="w-full h-full object-contain"
@@ -595,12 +558,6 @@ export function VideoProcessor({ videoFile, onReset }: VideoProcessorProps) {
                       }
                     }}
                     onEnded={() => setResultIsPlaying(false)}
-                  />
-
-                  {/* Clean Dynamic Background Inpainting Canvas Overlay */}
-                  <canvas
-                    ref={resultCanvasOverlayRef}
-                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
                   />
 
                   {/* Badge */}

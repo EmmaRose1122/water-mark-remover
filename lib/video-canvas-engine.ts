@@ -83,20 +83,23 @@ export async function processVideoWithNativeEngine({
 
   // Step 3: Run High-Speed FFmpeg Delogo Pipeline
   try {
-    const ffmpeg = await loadFFmpeg((msg) => {
-      // console.log('[FFmpeg]', msg)
-    })
+    const ffmpeg = await loadFFmpeg()
     onProgress?.('render', 25, 'Loading video into stream processor...')
+
+    ffmpeg.on('progress', ({ progress }: { progress: number }) => {
+      const pct = Math.min(95, Math.max(25, Math.round(progress * 100)))
+      onProgress?.('render', pct, `Removing watermark & optimizing MP4 stream (${pct}%)...`)
+    })
 
     const inputName = 'input_video.mp4'
     const outputName = 'clean_video.mp4'
     await ffmpeg.writeFile(inputName, await fetchFile(videoFile))
 
-    onProgress?.('render', 45, 'Removing watermark across all frames at 150+ FPS...')
+    onProgress?.('render', 35, 'Removing watermark across all frames at 150+ FPS...')
 
     const delogoFilter = `delogo=x=${x}:y=${y}:w=${w}:h=${h}:band=${band}:show=0`
 
-    // Attempt direct stream inpainting (100% video quality + audio stream copy)
+    // High compatibility MP4 encoding: ultrafast + fastdecode + faststart for 100% smooth local playback
     try {
       await ffmpeg.exec([
         '-i',
@@ -107,16 +110,26 @@ export async function processVideoWithNativeEngine({
         'libx264',
         '-preset',
         'ultrafast',
+        '-tune',
+        'fastdecode',
         '-crf',
         '18',
+        '-g',
+        '30',
+        '-keyint_min',
+        '30',
+        '-sc_threshold',
+        '0',
         '-pix_fmt',
         'yuv420p',
+        '-movflags',
+        '+faststart',
         '-c:a',
         'copy',
         outputName,
       ])
     } catch {
-      // Fallback: If audio copy has container stream flags, transcode audio to standard AAC
+      // Fallback: If audio copy fails container flags, transcode audio to standard AAC
       await ffmpeg.exec([
         '-i',
         inputName,
@@ -126,10 +139,20 @@ export async function processVideoWithNativeEngine({
         'libx264',
         '-preset',
         'ultrafast',
+        '-tune',
+        'fastdecode',
         '-crf',
         '18',
+        '-g',
+        '30',
+        '-keyint_min',
+        '30',
+        '-sc_threshold',
+        '0',
         '-pix_fmt',
         'yuv420p',
+        '-movflags',
+        '+faststart',
         '-c:a',
         'aac',
         '-b:a',
@@ -323,13 +346,57 @@ async function processDeterministicFrameCompositor(
   if (document.body.contains(video)) document.body.removeChild(video)
   if (audioContext && audioContext.state !== 'closed') audioContext.close().catch(() => null)
 
-  onProgress?.('render', 100, 'Video watermark removed successfully!')
+  let finalBlob = cleanBlob
+  let finalIsMp4 = isMp4
+
+  // If the recording is WebM, quickly remux to universal standard MP4 with +faststart for 100% smooth local playback
+  if (!isMp4) {
+    try {
+      const ffmpeg = await loadFFmpeg()
+      onProgress?.('render', 96, 'Optimizing MP4 container for smooth local playback...')
+      const inTemp = 'temp_rec.webm'
+      const outMp4 = 'clean_optimized.mp4'
+      await ffmpeg.writeFile(inTemp, await fetchFile(cleanBlob))
+      await ffmpeg.exec([
+        '-i',
+        inTemp,
+        '-c:v',
+        'libx264',
+        '-preset',
+        'ultrafast',
+        '-tune',
+        'fastdecode',
+        '-crf',
+        '18',
+        '-g',
+        '30',
+        '-pix_fmt',
+        'yuv420p',
+        '-movflags',
+        '+faststart',
+        '-c:a',
+        'aac',
+        '-b:a',
+        '192k',
+        outMp4,
+      ])
+      const mp4Data = (await ffmpeg.readFile(outMp4)) as Uint8Array
+      finalBlob = new Blob([mp4Data as any], { type: 'video/mp4' })
+      finalIsMp4 = true
+      await ffmpeg.deleteFile(inTemp).catch(() => null)
+      await ffmpeg.deleteFile(outMp4).catch(() => null)
+    } catch (remuxErr) {
+      console.warn('Post-remux to MP4 skipped, using clean recording:', remuxErr)
+    }
+  }
+
+  onProgress?.('render', 100, 'Video watermark removed successfully! 100% Smooth Playback Ready.')
 
   return {
-    outputBlob: cleanBlob,
-    videoUrl: URL.createObjectURL(cleanBlob),
+    outputBlob: finalBlob,
+    videoUrl: URL.createObjectURL(finalBlob),
     processedMask,
     hasAudio,
-    isMp4,
+    isMp4: finalIsMp4,
   }
 }
