@@ -42,7 +42,12 @@ export function DownloadButton({
 
     try {
       if (type === 'video') {
-        const finalName = `${filename}.${chosenFormat}`
+        let ext: string = chosenFormat
+        if (blob) {
+          if (blob.type.includes('mp4')) ext = 'mp4'
+          else if (blob.type.includes('webm')) ext = 'webm'
+        }
+        const finalName = `${filename}.${ext}`
         if (blob) {
           downloadBlob(blob, finalName)
         } else if (url) {
