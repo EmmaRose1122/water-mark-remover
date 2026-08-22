@@ -24,4 +24,7 @@ yarn-error.log*
 Thumbs.db
 
 # large media files
-Video - Facebook.mp4
+*.mp4
+*.mov
+*.webm
+
